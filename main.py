@@ -180,9 +180,9 @@ def matchJJFont(fontname):
     return results
 
 
-def saveJJFont(fontname, tablesDict):
+def saveJJFont(fontname, tablesDict, tablesFolderPath=os.path.join(PWD, "tables")):
     def saveJSON(fontname, tablesDict):
-        fontJsonPath = os.path.join(PWD, "tables", fontname + '.json')
+        fontJsonPath = os.path.join(tablesFolderPath, fontname + '.json')
         with open(fontJsonPath, 'w') as f:
             json.dump(tablesDict, f, sort_keys=True, indent=4)
 
@@ -260,7 +260,7 @@ def saveJJFont(fontname, tablesDict):
 
         htmlText = htmlTemplate.render(fontname=fontname, jjdicts=jjdicts)
 
-        htmlPath = os.path.join(PWD, "tables", fontname + '.html')
+        htmlPath = os.path.join(tablesFolderPath, fontname + '.html')
         with open(htmlPath, 'w') as f:
             f.write(htmlText)
 
