@@ -317,6 +317,9 @@ export function replaceJjwxcCharacter(fontName: string, inputText: string) {
     tablesFolder = os.path.join(PWD, 'tables')
     jsonFiles = list(filter(lambda x: x.endswith('.json'), os.listdir(tablesFolder)))
 
+    if not os.path.exists(distFolder):
+        os.mkdir(distFolder)
+
     bundle = {}
     for fname in jsonFiles:
         fontname = fname.split('.')[0]
