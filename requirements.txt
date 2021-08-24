@@ -1,0 +1,7 @@
+numpy
+Pillow
+brotli
+fonttools
+fs
+imagehash
+Jinja2
