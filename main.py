@@ -112,7 +112,7 @@ def getJJimageHashs(fontname):
     with MEM.open(fname, 'wb') as fw:
         woff2.decompress(fontPath, fw)
     with MEM.open(fname, 'rb') as fr:
-        fontTTF = ImageFont.truetype(fr, 224, encoding="utf-8")
+        fontTTF = ImageFont.truetype(fr, SIZE - 5, encoding="utf-8")
         ttf = ttFont.TTFont(fr)
 
     keys = listTTF(ttf)
@@ -188,66 +188,66 @@ def saveJJFont(fontname, tablesDict, tablesFolderPath=os.path.join(PWD, "tables"
 
     def saveHTML(fontname, tablesDict):
         htmlTemplate = Template('''
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="utf-8" />
-                <meta http-equiv="Content-Type" content="text/html;charset=UTF-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-                <meta name="referrer" content="no-referrer" />
-                <title>{{ fontname }}</title>
-                <style>
-                body {
-                    background-color: #f0f0f2;
-                    margin: 0;
-                    padding: 0;
-                    font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI",
-                    "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
-                }
-                div.main {
-                    width: 600px;
-                    margin: 5em auto;
-                    padding: 2em;
-                    background-color: #fdfdff;
-                    border-radius: 0.5em;
-                    box-shadow: 2px 3px 7px 2px rgba(0, 0, 0, 0.02);
-                }
-                .jjfont {
-                    font-family: {{ fontname }}, 'Microsoft YaHei', PingFangSC-Regular, HelveticaNeue-Light, 'Helvetica Neue Light', sans-serif !important;;
-                }
-                @font-face {
-                    font-family: {{ fontname }};
-                    src: url('http://static.jjwxc.net/tmp/fonts/{{ fontname }}.woff2?h=my.jjwxc.net') format('woff2');
-                }
-                </style>
-            </head>
-            <body>
-                <div class="main">
-                <h1>{{ fontname }}</h1>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html;charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer" />
+    <title>{{ fontname }}</title>
+    <style>
+    body {
+        background-color: #f0f0f2;
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI",
+        "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    }
+    div.main {
+        width: 600px;
+        margin: 5em auto;
+        padding: 2em;
+        background-color: #fdfdff;
+        border-radius: 0.5em;
+        box-shadow: 2px 3px 7px 2px rgba(0, 0, 0, 0.02);
+    }
+    .jjfont {
+        font-family: {{ fontname }}, 'Microsoft YaHei', PingFangSC-Regular, HelveticaNeue-Light, 'Helvetica Neue Light', sans-serif !important;;
+    }
+    @font-face {
+        font-family: {{ fontname }};
+        src: url('http://static.jjwxc.net/tmp/fonts/{{ fontname }}.woff2?h=my.jjwxc.net') format('woff2');
+    }
+    </style>
+</head>
+<body>
+    <div class="main">
+    <h1>{{ fontname }}</h1>
 
-                <div>
-                    <table>
-                    <thead>
-                        <tr>
-                        <th>晋江字符（编码）</th>
-                        <th>晋江字符（渲染）</th>
-                        <th>通用字符</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for jjdict in jjdicts %}
-                        <tr>
-                        <td>{{ jjdict.ord|e }}</td>
-                        <td class="jjfont">{{ jjdict.jjcode|e }}</td>
-                        <td>{{ jjdict.unicode|e }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                    </table>
-                </div>
-                </div>
-            </body>
-            </html>
+    <div>
+        <table>
+        <thead>
+            <tr>
+            <th>晋江字符（编码）</th>
+            <th>晋江字符（渲染）</th>
+            <th>通用字符</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for jjdict in jjdicts %}
+            <tr>
+            <td>{{ jjdict.ord|e }}</td>
+            <td class="jjfont">{{ jjdict.jjcode|e }}</td>
+            <td>{{ jjdict.unicode|e }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        </table>
+    </div>
+    </div>
+</body>
+</html>
         ''')
 
         jjdicts = []
@@ -339,10 +339,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="晋江反爬字体破解辅助工具。")
     parser.add_argument('--all', action='store_true', help="匹配所有fonts目录下的woff2字体文件。")
     parser.add_argument('--bundle', action='store_true', help="打包tables目录下所有json文件。")
-    parser.add_argument('--font', help="匹配指字名称字体文件。 例始： --font jjwxcfont_00gxm")
+    parser.add_argument('--font', help="匹配指字名称字体文件。 例始：--font jjwxcfont_00gxm")
     args = parser.parse_args()
 
     if args.all:
         matchAll()
     elif args.bundle:
         bundle()
+    elif args.font:
+        JJFont(args.font)
