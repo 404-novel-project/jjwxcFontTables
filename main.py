@@ -145,8 +145,10 @@ def matchJJFont(fontname):
 
     def patch(jjFontTableDict: Dict):
         def replace(x):
-            r = {"杲": "果",
-                 "曼": "最"}
+            r = {
+                "杲": "果",
+                "曼": "最"
+            }
             rk = r.keys()
             if x in rk:
                 return r[x]
@@ -288,6 +290,30 @@ def matchAll():
     pool.join()
 
 
+def matchNew():
+    fontFolderPath = os.path.join(PWD, 'fonts')
+    tablesFolderPath = os.path.join(PWD, "tables")
+
+    fontList = set(
+        map(lambda x: x.split('.')[0],
+            filter(lambda x: x.endswith('.woff2'), os.listdir(fontFolderPath))
+            )
+    )
+    fontJsonList = set(
+        map(lambda x: x.split('.')[0],
+            filter(lambda x: x.endswith('.json'), os.listdir(tablesFolderPath))
+            )
+    )
+    newFonts = fontList.difference(fontJsonList)
+
+    import multiprocessing
+    pool = multiprocessing.Pool()
+    for fontname in newFonts:
+        pool.apply_async(JJFont, (fontname,))
+    pool.close()
+    pool.join()
+
+
 def bundle():
     def saveTS():
         ts1 = '''interface jjwxcFontTable {
@@ -338,13 +364,17 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="晋江反爬字体破解辅助工具。")
     parser.add_argument('--all', action='store_true', help="匹配所有fonts目录下的woff2字体文件。")
+    parser.add_argument('--new', action='store_true', help="匹配fonts目录下新woff2字体。")
     parser.add_argument('--bundle', action='store_true', help="打包tables目录下所有json文件。")
     parser.add_argument('--font', help="匹配指字名称字体文件。 例始：--font jjwxcfont_00gxm")
     args = parser.parse_args()
 
     if args.all:
         matchAll()
+    elif args.new:
+        matchNew()
     elif args.bundle:
         bundle()
     elif args.font:
         JJFont(args.font)
+

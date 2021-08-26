@@ -2,10 +2,9 @@ import json
 import os
 from typing import Dict
 
-from main import saveJJFont
+import main
 
-PWD = os.path.abspath(os.path.dirname(__file__))
-tablesFolderPath = PWD
+tablesFolderPath = os.path.join(main.PWD, 'tables')
 
 patchDicts = {
     "jjwxcfont_00heq": {
@@ -22,6 +21,9 @@ patchDicts = {
     },
     "jjwxcfont_00gv7": {
         "\uea86": "已"
+    },
+    "jjwxcfont_000qt": {
+        "\uef45": "已"
     }
 }
 
@@ -49,15 +51,18 @@ def patch(fontname, jjFontTableDict: Dict):
     return dict(zip(k, v_patch))
 
 
-def main():
-    jsonFlist = list(filter(lambda x: x.endswith('.json'), os.listdir(PWD)))
+def run():
+    jsonFlist = list(
+        filter(lambda x: x.endswith('.json'), os.listdir(tablesFolderPath))
+    )
     for fname in jsonFlist:
         fontname = fname.split('.')[0]
-        with open(fname, 'r') as f:
+        fpath = os.path.join(tablesFolderPath, fname)
+        with open(fpath, 'r') as f:
             table = json.load(f)
         table = patch(fontname, table)
-        saveJJFont(fontname, table, PWD)
+        main.saveJJFont(fontname, table, tablesFolderPath)
 
 
 if __name__ == '__main__':
-    main()
+    run()
