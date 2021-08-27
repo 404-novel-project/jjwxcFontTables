@@ -259,6 +259,7 @@ def matchJJFont(fontname: str) -> dict[str, str]:
     JJkeys = list(JJhashsdict.keys())
     JJhashs = list(JJhashsdict.values())
 
+    logging.info(f'开始识别字体 {fontname}')
     results = {}
     for i in range(len(JJkeys)):
         jjkey = JJkeys[i]
@@ -266,10 +267,11 @@ def matchJJFont(fontname: str) -> dict[str, str]:
             continue
         jjhash = JJhashs[i]
         mchar = match(jjkey, jjhash)
-        logging.info("{}\t{}\t{}".format(fontname, ord(jjkey), mchar))
+        logging.debug("{}\t{}\t{}".format(fontname, ord(jjkey), mchar))
         results[jjkey] = mchar
 
     results = patch(results)
+    logging.info(f'识别字体 {fontname} 完成。')
     return results
 
 
@@ -370,10 +372,10 @@ def JJFont(fontname: str) -> None:
     """
     自动识别指定名称的字体文件。
     """
-    logging.info("{}\t{}".format(fontname, 'start!'))
+    logging.debug("{}\t{}".format(fontname, 'start!'))
     results = matchJJFont(fontname)
     saveJJFont(fontname, results)
-    logging.info("{}\t{}".format(fontname, 'finished!'))
+    logging.debug("{}\t{}".format(fontname, 'finished!'))
 
 
 def matchAll() -> None:
@@ -446,7 +448,7 @@ def bundle() -> None:
 if __name__ == "__main__":
     import argparse
 
-    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+    logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
     parser = argparse.ArgumentParser(description="晋江反爬字体破解辅助工具。")
     parser.add_argument('--all', action='store_true', help="匹配所有fonts目录下的woff2字体文件。")
