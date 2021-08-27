@@ -14,14 +14,16 @@ from typing import Optional
 
 import main
 
+MG: multiprocessing.managers.SyncManager = multiprocessing.Manager()
+ON_PENDING = MG.list()
+ON_WORKING = MG.list()
+WORKING_NUM = MG.Value('i', 0)
+
 
 class RequestHandler(BaseHTTPRequestHandler):
-    server_version = "jjwxcHTTP"
     protocol_version = "HTTP/1.1"
 
     path_match = re.compile(r'^/(jjwxcfont_\w{5})\.json$')
-    manager = multiprocessing.Manager()
-    ON_WORKING = manager.list()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -103,7 +105,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.send_header("Content-type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(fs[6]))
             self.send_header("Last-Modified", self.date_time_string(int(fs.st_mtime)))
-            self.send_header("Cache-Control", "public, max-age=21600")
+            self.send_header("Cache-Control", "public, max-age=86400")
             self.send_cors_header()
             self.end_headers()
 
@@ -122,9 +124,8 @@ class RequestHandler(BaseHTTPRequestHandler):
         code = HTTPStatus.NOT_FOUND
         shortmsg, longmsg = self.responses[code]
 
-        self.log_error("code %d, message %s", code, shortmsg)
         self.send_response(code, shortmsg)
-        self.send_header('Connection', 'close')
+        self.send_header("Cache-Control", "public, max-age=600")
 
         content = (self.error_message_format % {
             'code': code,
@@ -141,10 +142,9 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
         # 启用后台抓取解析线程
-        if fontname not in self.ON_WORKING:
-            self.ON_WORKING.append(fontname)
-            process = multiprocessing.Process(target=self.fetch_font, args=(self, fontname,))
-            process.start()
+        if fontname not in ON_PENDING and fontname not in ON_WORKING:
+            ON_PENDING.append(fontname)
+            self.start_backend()
 
     def send_cors_header(self) -> None:
         """
@@ -156,6 +156,20 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Date, Etag, Content-Type, Content-Length")
         self.send_header("Access-Control-Max-Age", "86400")
 
+    def start_backend(self) -> None:
+        """
+        启动后端识别程序
+        """
+        logging.info(f"ON_PENDING length： {len(ON_PENDING)}, WORKING_NUM: {WORKING_NUM}")
+        if WORKING_NUM.value <= multiprocessing.cpu_count() and len(ON_PENDING) != 0:
+            for fontname in ON_PENDING:
+                if fontname not in ON_WORKING:
+                    ON_WORKING.append(fontname)
+                    ON_PENDING.remove(fontname)
+                    WORKING_NUM.value = WORKING_NUM.value + 1
+                    process = multiprocessing.Process(target=self.fetch_font, args=(fontname,))
+                    process.start()
+
     def fetch_font(self, fontname: str) -> None:
         """
         对 main.JJFont 的包装
@@ -163,11 +177,13 @@ class RequestHandler(BaseHTTPRequestHandler):
         try:
             t = time.time()
             main.JJFont(fontname)
-            self.ON_WORKING.remove(fontname)
+            ON_WORKING.remove(fontname)
+            WORKING_NUM.value = WORKING_NUM.value - 1
             cost_time = time.time() - t
             logging.info("识别字体 {} 共耗费 {:.2f} 秒。".format(fontname, cost_time))
+            self.start_backend()
         except FileNotFoundError:
-            pass
+            WORKING_NUM.value = WORKING_NUM.value - 1
 
 
 if __name__ == '__main__':

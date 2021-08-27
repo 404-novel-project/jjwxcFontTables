@@ -20,11 +20,7 @@ optional arguments:
 
 晋江反爬字体对照表位于 `tables` 目录，其中json文件为字体对照表，html文件用于方便校对查看。
 
-如需打包版本，请切换至 gh-pages 分支。`bundle.json` 即为打包后版本。`bundle.ts` 提供了 `replaceJjwxcCharacter` 函数，可一次性替换所有晋江反爬字符。
-
-```typescript
-export declare function replaceJjwxcCharacter(fontName: string, inputText: string): string;
-```
+如需打包版本，请切换至 gh-pages 分支。`bundle.json` 即为打包后版本。
 
 ## 实现思路
 

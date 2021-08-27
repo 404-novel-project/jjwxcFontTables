@@ -426,7 +426,7 @@ def bundle() -> None:
         """
         将 tables 目录下所有JSON文件打包为Typescript模块文件。
         """
-        ts = 'interface jjwxcFontTable {[index: string]: string;} ' \
+        ts = 'export interface jjwxcFontTable {[index: string]: string;} ' \
              'interface jjwxcFontTables {[index: string]: jjwxcFontTable;} ' \
              f'export const jjwxcFontTables: jjwxcFontTables = {json.dumps(bundleDict)}'
         with open(os.path.join(DistDir, 'bundle.ts'), 'w') as fp:
