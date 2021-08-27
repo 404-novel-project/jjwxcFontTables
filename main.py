@@ -1,42 +1,64 @@
 #!/usr/bin/env python
 import json
+import logging
 import os
+import sys
+import tempfile
 from functools import lru_cache
-from typing import Dict
 
 import imagehash
 import numpy as np
+import requests
 from PIL import Image, ImageDraw, ImageFont
 from fontTools.ttLib import woff2, ttFont
-from fs.memoryfs import MemoryFS
 from jinja2 import Template
 
-PWD = os.path.abspath(os.path.dirname(__file__))
-MEM = MemoryFS()
+PWD: str = os.path.abspath(os.path.dirname(__file__))
+FontsDir = os.path.join(PWD, 'fonts')
+TablesDir = os.path.join(PWD, 'tables')
+DistDir = os.path.join(PWD, 'dist')
 
 # Setting
-SIZE = 228
+SIZE: int = 228
 W, H = (SIZE, SIZE)
 
 # FZFont
-FZFontTTFPath = os.path.join(PWD, "assets", "FZLanTingHei-M-GBK.ttf")
-FZFontTTF = ImageFont.truetype(FZFontTTFPath, SIZE, encoding="utf-8")
+FZFontTTFPath: str = os.path.join(PWD, "assets", "FZLanTingHei-M-GBK.ttf")
+FZFontTTF: ImageFont.FreeTypeFont = ImageFont.truetype(FZFontTTFPath, SIZE, encoding="utf-8")
 
 # FZHashs
-FZHashPath = os.path.join(PWD, "assets", "FZLanTingHei-M-GBK-Hash-Table.json")
+FZHashPath: str = os.path.join(PWD, "assets", "FZLanTingHei-M-GBK-Hash-Table.json")
 
 # ImageHash
-HashSize = 16
+HashSize: int = 16
 HashFunc = imagehash.average_hash
 HashMeanFunc = np.mean
 
 
-def drawFZ(character):
+def mkdir() -> None:
+    """
+    创建所需文件夹。
+    """
+    for path in [FontsDir, TablesDir, DistDir]:
+        if not os.path.exists(path):
+            os.mkdir(path)
+
+
+mkdir()
+
+
+def drawFZ(character: str) -> ImageDraw:
+    """
+    输入字符，输出方正兰亭黑字体绘制结果。
+    """
     return draw(character, FZFontTTF)
 
 
 @lru_cache(maxsize=1024)
-def draw(character, fontTTF):
+def draw(character: str, fontTTF: ImageFont.FreeTypeFont) -> ImageDraw:
+    """
+    输入字符以及字体文件，输出绘制结果。
+    """
     image = Image.new("RGB", (W, H), "white")
     d = ImageDraw.Draw(image)
     offset_w, offset_h = fontTTF.getoffset(character)
@@ -46,14 +68,20 @@ def draw(character, fontTTF):
     return image
 
 
-def compare(image1, image2):
+def compare(image1: ImageDraw, image2: ImageDraw) -> float:
+    """
+    输入两字体图像，输出差异度。
+    """
     array1 = np.asarray(image1) / 255
     array2 = np.asarray(image2) / 255
     diff = (array1 - array2).var()
     return diff
 
 
-def listTTF(ttf):
+def listTTF(ttf: ttFont.TTFont) -> list[str]:
+    """
+    输入字体文件，输出该字体文件下所有字符。
+    """
     chars = []
     for x in ttf["cmap"].tables:
         for y in x.cmap.items():
@@ -63,8 +91,15 @@ def listTTF(ttf):
 
 
 @lru_cache()
-def getFZImageHashs():
+def getFZImageHashs() -> dict[str, imagehash.ImageHash]:
+    """
+    获取方正兰亭黑字体ImageHash字典。
+    """
+
     def genFZimageHashs():
+        """
+        生成方正兰亭黑字体ImageHash字典。
+        """
         ttf = ttFont.TTFont(FZFontTTFPath)
         chars = listTTF(ttf)
 
@@ -73,8 +108,11 @@ def getFZImageHashs():
         return dict(zip(keys, hashs))
 
     def loadFZimageHashs():
+        """
+        从JSON文件载入方正兰亭黑字体ImageHash字典。
+        """
         with open(FZHashPath, 'r') as f:
-            _hashsdict_save: Dict = json.load(f)
+            _hashsdict_save: dict[str, str] = json.load(f)
         _keys = _hashsdict_save.keys()
         _hashs_str = _hashsdict_save.values()
         _hashs = list(map(lambda x: imagehash.hex_to_hash(x), _hashs_str))
@@ -83,6 +121,9 @@ def getFZImageHashs():
         return hashsdict
 
     def saveFZimageHashs():
+        """
+        将方正兰亭黑字体ImageHash字典保存为JSON文件。
+        """
         hashsdict = genFZimageHashs()
         _keys = hashsdict.keys()
         _hashs = hashsdict.values()
@@ -97,32 +138,78 @@ def getFZImageHashs():
     if os.path.exists(FZHashPath):
         try:
             return loadFZimageHashs()
-        except BaseException as e:
+        except json.decoder.JSONDecodeError:
             return saveFZimageHashs()
     else:
         return saveFZimageHashs()
 
 
-def getJJimageHashs(fontname):
-    fontPath = os.path.join(PWD, "fonts", fontname + ".woff2")
-    if not os.path.exists(fontPath):
+def getFontFile(fontname: str) -> bytes:
+    """
+    请求字体文件
+    """
+    logging.info("请求字体文件：{}".format(fontname))
+    url = "http://static.jjwxc.net/tmp/fonts/{}.woff2?h=my.jjwxc.net".format(fontname)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:91.0) Gecko/20100101 Firefox/91.0",
+        "Accept": "application/font-woff2;q=1.0,application/font-woff;q=0.9,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.5",
+        "Pragma": "no-cache",
+        "Cache-Control": "no-cache",
+        "Referer": "http://my.jjwxc.net/",
+        "Origin": "http://my.jjwxc.net"
+    }
+    resp = requests.get(url, headers=headers)
+    if resp.status_code == 404:
+        logging.error("未发现字体文件：{}".format(fontname))
         raise FileNotFoundError
+    return resp.content
 
-    fname = fontname + '.ttf'
-    with MEM.open(fname, 'wb') as fw:
-        woff2.decompress(fontPath, fw)
-    with MEM.open(fname, 'rb') as fr:
-        fontTTF = ImageFont.truetype(fr, SIZE - 5, encoding="utf-8")
-        ttf = ttFont.TTFont(fr)
+
+def saveFontFile(fontname: str) -> bytes:
+    """
+    请求并保存字体文件
+    """
+    font = getFontFile(fontname)
+    fontPath = os.path.join(FontsDir, "{}.woff2".format(fontname))
+    with open(fontPath, 'wb') as f:
+        logging.info("正在保存字体：{}".format(fontname))
+        f.write(font)
+    return font
+
+
+def getJJimageHashs(fontname: str) -> tuple[dict[str, imagehash.ImageHash], ImageFont.FreeTypeFont]:
+    """
+    获取指定名称晋江字体的ImageHash字典。
+    """
+    fontPath = os.path.join(FontsDir, "{}.woff2".format(fontname))
+    if not os.path.exists(fontPath):
+        try:
+            saveFontFile(fontname)
+        except FileNotFoundError as e:
+            raise e
+
+    with tempfile.TemporaryFile() as tmp:
+        woff2.decompress(fontPath, tmp)
+        tmp.seek(0)
+        fontTTF = ImageFont.truetype(tmp, SIZE - 5, encoding="utf-8")
+        ttf = ttFont.TTFont(tmp)
 
     keys = listTTF(ttf)
     hashs = list(map(lambda x: HashFunc(draw(x, fontTTF), hash_size=HashSize, mean=HashMeanFunc), keys))
     return dict(zip(keys, hashs)), fontTTF
 
 
-def matchJJFont(fontname):
-    def match(jjkey, jjhash, JJFont, FZkeys, FZhashs):
-        diffs = list(map(lambda fzhash: fzhash - jjhash, FZhashs))
+def matchJJFont(fontname: str) -> dict[str, str]:
+    """
+    输入晋江字体名称，返回该字体匹配结果。
+    """
+
+    def match(key: str, ihash: imagehash.ImageHash) -> str:
+        """
+        输入晋江字符以及晋江字符所对应ImageHash，返回最匹配的普通字符。
+        """
+        diffs = list(map(lambda fzhash: fzhash - ihash, FZhashs))
         diffs_dict = dict(zip(FZkeys, diffs))
 
         mkey = None
@@ -133,17 +220,21 @@ def matchJJFont(fontname):
             if mkey is None:
                 mkey = k
                 mdiff = diff
-                mdiff2 = compare(draw(jjkey, JJFont), drawFZ(k))
+                mdiff2 = compare(draw(key, JJFontTTF), drawFZ(k))
             else:
                 if diff <= mdiff:
-                    diff2 = compare(draw(jjkey, JJFont), drawFZ(k))
+                    diff2 = compare(draw(key, JJFontTTF), drawFZ(k))
                     if diff2 < mdiff2:
                         mkey = k
                         mdiff = diff
                         mdiff2 = diff2
         return mkey
 
-    def patch(jjFontTableDict: Dict):
+    def patch(jjFontTableDict: dict[str, str]) -> dict[str, str]:
+        """
+        对自动识别的晋江字符对照表进行一些修正。
+        """
+
         def replace(x):
             r = {
                 "杲": "果",
@@ -164,7 +255,7 @@ def matchJJFont(fontname):
     FZkeys = FZhashsdict.keys()
     FZhashs = FZhashsdict.values()
 
-    JJhashsdict, JJFont = getJJimageHashs(fontname)
+    JJhashsdict, JJFontTTF = getJJimageHashs(fontname)
     JJkeys = list(JJhashsdict.keys())
     JJhashs = list(JJhashsdict.values())
 
@@ -174,23 +265,33 @@ def matchJJFont(fontname):
         if jjkey == 'x':
             continue
         jjhash = JJhashs[i]
-        mchar = match(jjkey, jjhash, JJFont, FZkeys, FZhashs)
-        print(fontname, ord(jjkey), mchar)
+        mchar = match(jjkey, jjhash)
+        logging.info("{}\t{}\t{}".format(fontname, ord(jjkey), mchar))
         results[jjkey] = mchar
 
     results = patch(results)
     return results
 
 
-def saveJJFont(fontname, tablesDict, tablesFolderPath=os.path.join(PWD, "tables")):
-    def saveJSON(fontname, tablesDict):
+def saveJJFont(fontname: str, tablesDict: dict[str, str], tablesFolderPath: str = TablesDir) -> None:
+    """
+    将晋江字体对照表保存为JSON文件、HTML文件。
+    """
+
+    def saveJSON() -> None:
+        """
+        将晋江字体对照表保存为JSON文件。
+        """
         fontJsonPath = os.path.join(tablesFolderPath, fontname + '.json')
         with open(fontJsonPath, 'w') as f:
             json.dump(tablesDict, f, sort_keys=True, indent=4)
 
-    def saveHTML(fontname, tablesDict):
-        htmlTemplate = Template('''
-<!DOCTYPE html>
+    def saveHTML() -> None:
+        """
+        将晋江字体对照表保存为HTML文件。
+        """
+        # noinspection PyPep8
+        htmlTemplate = Template('''<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8" />
@@ -225,39 +326,34 @@ def saveJJFont(fontname, tablesDict, tablesFolderPath=os.path.join(PWD, "tables"
 </head>
 <body>
     <div class="main">
-    <h1>{{ fontname }}</h1>
-
-    <div>
-        <table>
-        <thead>
-            <tr>
-            <th>晋江字符（编码）</th>
-            <th>晋江字符（渲染）</th>
-            <th>通用字符</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for jjdict in jjdicts %}
-            <tr>
-            <td>{{ jjdict.ord|e }}</td>
-            <td class="jjfont">{{ jjdict.jjcode|e }}</td>
-            <td>{{ jjdict.unicode|e }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-        </table>
-    </div>
+        <h1>{{ fontname }}</h1>
+        <div>
+            <table>
+            <thead>
+                <tr>
+                <th>晋江字符（编码）</th>
+                <th>晋江字符（渲染）</th>
+                <th>通用字符</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for jjdict in jjdicts %}
+                <tr>
+                <td>{{ jjdict.ord|e }}</td>
+                <td class="jjfont">{{ jjdict.jjcode|e }}</td>
+                <td>{{ jjdict.unicode|e }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            </table>
+        </div>
     </div>
 </body>
-</html>
-        ''')
+</html>''')
 
         jjdicts = []
         for k in tablesDict:
-            jjdict = {}
-            jjdict['ord'] = str(hex(ord(k))).replace('0x', 'U+')
-            jjdict['jjcode'] = k
-            jjdict['unicode'] = tablesDict[k]
+            jjdict = {'ord': str(hex(ord(k))).replace('0x', 'U+'), 'jjcode': k, 'unicode': tablesDict[k]}
             jjdicts.append(jjdict)
 
         htmlText = htmlTemplate.render(fontname=fontname, jjdicts=jjdicts)
@@ -266,20 +362,25 @@ def saveJJFont(fontname, tablesDict, tablesFolderPath=os.path.join(PWD, "tables"
         with open(htmlPath, 'w') as f:
             f.write(htmlText)
 
-    saveJSON(fontname, tablesDict)
-    saveHTML(fontname, tablesDict)
+    saveJSON()
+    saveHTML()
 
 
-def JJFont(fontname):
-    print(fontname, 'start!')
+def JJFont(fontname: str) -> None:
+    """
+    自动识别指定名称的字体文件。
+    """
+    logging.info("{}\t{}".format(fontname, 'start!'))
     results = matchJJFont(fontname)
     saveJJFont(fontname, results)
-    print(fontname, 'finished!')
+    logging.info("{}\t{}".format(fontname, 'finished!'))
 
 
-def matchAll():
-    fontFolder = os.path.join(PWD, 'fonts')
-    flist = os.listdir(fontFolder)
+def matchAll() -> None:
+    """
+    自动识别 fonts 目录下所有 woff2 文件。
+    """
+    flist = os.listdir(FontsDir)
     fontnames = list(map(lambda x: x.split('.')[0], flist))
 
     import multiprocessing
@@ -290,18 +391,18 @@ def matchAll():
     pool.join()
 
 
-def matchNew():
-    fontFolderPath = os.path.join(PWD, 'fonts')
-    tablesFolderPath = os.path.join(PWD, "tables")
-
+def matchNew() -> None:
+    """
+    自动识别 fonts 目录下未被识别的字体文件。
+    """
     fontList = set(
         map(lambda x: x.split('.')[0],
-            filter(lambda x: x.endswith('.woff2'), os.listdir(fontFolderPath))
+            filter(lambda x: x.endswith('.woff2'), os.listdir(FontsDir))
             )
     )
     fontJsonList = set(
         map(lambda x: x.split('.')[0],
-            filter(lambda x: x.endswith('.json'), os.listdir(tablesFolderPath))
+            filter(lambda x: x.endswith('.json'), os.listdir(TablesDir))
             )
     )
     newFonts = fontList.difference(fontJsonList)
@@ -314,53 +415,38 @@ def matchNew():
     pool.join()
 
 
-def bundle():
-    def saveTS():
-        ts1 = '''interface jjwxcFontTable {
-  [index: string]: string;
-}
-interface jjwxcFontTables {
-  [index: string]: jjwxcFontTable;
-}
+def bundle() -> None:
+    """
+    将 tables 目录下所有JSON文件打包为单一JSON文件以及Typescript模块文件。
+    """
 
-export function replaceJjwxcCharacter(fontName: string, inputText: string) {
-  let outputText = inputText;
-  const jjwxcFontTable = jjwxcFontTables[fontName];
-  if (jjwxcFontTable) {
-    for (const jjwxcCharacter in jjwxcFontTable) {
-      const normalCharacter = jjwxcFontTable[jjwxcCharacter];
-      outputText = outputText.replaceAll(jjwxcCharacter, normalCharacter);
-    }
-    outputText = outputText.replaceAll("\u200c", "");
-  }
-  return outputText;
-}\n\n'''
-        ts2 = 'const jjwxcFontTables: jjwxcFontTables = ' + json.dumps(bundle)
-        with open(os.path.join(distFolder, 'bundle.ts'), 'w') as f:
-            f.write(ts1 + ts2)
+    def saveTS() -> None:
+        """
+        将 tables 目录下所有JSON文件打包为Typescript模块文件。
+        """
+        ts = 'export const jjwxcFontTables: jjwxcFontTables = ' + json.dumps(bundleDict)
+        with open(os.path.join(DistDir, 'bundle.ts'), 'w') as fp:
+            fp.write(ts)
 
-    distFolder = os.path.join(PWD, 'dist')
-    tablesFolder = os.path.join(PWD, 'tables')
-    jsonFiles = list(filter(lambda x: x.endswith('.json'), os.listdir(tablesFolder)))
+    jsonFiles = list(filter(lambda x: x.endswith('.json'), os.listdir(TablesDir)))
 
-    if not os.path.exists(distFolder):
-        os.mkdir(distFolder)
-
-    bundle = {}
+    bundleDict = {}
     for fname in jsonFiles:
         fontname = fname.split('.')[0]
-        with open(os.path.join(tablesFolder, fname), 'r') as f:
+        with open(os.path.join(TablesDir, fname), 'r') as f:
             table = json.load(f)
-        bundle[fontname] = table
+        bundleDict[fontname] = table
 
-    with open(os.path.join(distFolder, 'bundle.json'), 'w') as f:
-        json.dump(bundle, f)
+    with open(os.path.join(DistDir, 'bundle.json'), 'w') as f:
+        json.dump(bundleDict, f)
 
     saveTS()
 
 
 if __name__ == "__main__":
     import argparse
+
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
     parser = argparse.ArgumentParser(description="晋江反爬字体破解辅助工具。")
     parser.add_argument('--all', action='store_true', help="匹配所有fonts目录下的woff2字体文件。")

@@ -4,8 +4,6 @@ from typing import Dict
 
 import main
 
-tablesFolderPath = os.path.join(main.PWD, 'tables')
-
 patchDicts = {
     "jjwxcfont_00heq": {
         "\ueae6": "已"
@@ -28,8 +26,15 @@ patchDicts = {
 }
 
 
-def patch(fontname, jjFontTableDict: Dict):
-    def replace(x):
+def patch(fontname: str, jjFontTableDict: dict[str, str]) -> dict[str, str]:
+    """
+    对晋江字符对照表进行一些修正。
+    """
+
+    def replace(x: str) -> str:
+        """
+        通用修正
+        """
         r = {"杲": "果",
              "曼": "最"}
         rk = r.keys()
@@ -38,30 +43,36 @@ def patch(fontname, jjFontTableDict: Dict):
         else:
             return x
 
-    def replace0():
+    def replace_by_dict() -> None:
+        """
+        字典修正
+        """
         if patchDicts.get(fontname):
             r = patchDicts[fontname]
             for i in r:
                 jjFontTableDict[i] = r[i]
 
-    replace0()
+    replace_by_dict()
     k = jjFontTableDict.keys()
     v = jjFontTableDict.values()
     v_patch = list(map(replace, v))
     return dict(zip(k, v_patch))
 
 
-def run():
+def run() -> None:
+    """
+    主入口，修正 tables 目录下所有结果。
+    """
     jsonFlist = list(
-        filter(lambda x: x.endswith('.json'), os.listdir(tablesFolderPath))
+        filter(lambda x: x.endswith('.json'), os.listdir(main.TablesDir))
     )
     for fname in jsonFlist:
         fontname = fname.split('.')[0]
-        fpath = os.path.join(tablesFolderPath, fname)
+        fpath = os.path.join(main.TablesDir, fname)
         with open(fpath, 'r') as f:
             table = json.load(f)
         table = patch(fontname, table)
-        main.saveJJFont(fontname, table, tablesFolderPath)
+        main.saveJJFont(fontname, table, main.TablesDir)
 
 
 if __name__ == '__main__':
