@@ -1,13 +1,13 @@
 import datetime
 import email.utils
 import html
-import time
 import logging
 import multiprocessing
 import os
 import re
 import shutil
 import sys
+import time
 from http import HTTPStatus
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from typing import Optional
@@ -111,9 +111,9 @@ class RequestHandler(BaseHTTPRequestHandler):
                 shutil.copyfileobj(f, self.wfile)
 
             f.close()
-        except Exception:
+        except Exception as e:
             f.close()
-            raise
+            raise e
 
     def not_found(self, fontname: str) -> None:
         """
@@ -156,7 +156,6 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Date, Etag, Content-Type, Content-Length")
         self.send_header("Access-Control-Max-Age", "86400")
 
-    @staticmethod
     def fetch_font(self, fontname: str) -> None:
         """
         对 main.JJFont 的包装
