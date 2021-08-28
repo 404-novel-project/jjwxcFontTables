@@ -12,7 +12,7 @@ import numpy as np
 import requests
 from PIL import Image, ImageDraw, ImageFont
 from fontTools.ttLib import woff2, ttFont
-from jinja2 import Template
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 PWD: str = os.path.abspath(os.path.dirname(__file__))
 FontsDir: str = os.path.join(PWD, 'fonts')
@@ -34,6 +34,9 @@ FZHashPath: str = os.path.join(PWD, "assets", "FZLanTingHei-M-GBK-Hash-Table.jso
 HashSize: int = 16
 HashFunc = imagehash.average_hash
 HashMeanFunc = np.mean
+
+# Jinja2
+Env: Environment = Environment(loader=FileSystemLoader(os.path.join(PWD, 'templates')), autoescape=select_autoescape())
 
 
 def mkdir() -> None:
@@ -345,65 +348,7 @@ def saveJJFont(fontname: str, tablesDict: dict[str, str], tablesFolderPath: str 
         将晋江字体对照表保存为HTML文件。
         """
         # noinspection PyPep8
-        htmlTemplate = Template('''<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8" />
-    <meta http-equiv="Content-Type" content="text/html;charset=UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="referrer" content="no-referrer" />
-    <title>{{ fontname }}</title>
-    <style>
-    body {
-        background-color: #f0f0f2;
-        margin: 0;
-        padding: 0;
-        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI",
-        "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
-    }
-    div.main {
-        width: 600px;
-        margin: 5em auto;
-        padding: 2em;
-        background-color: #fdfdff;
-        border-radius: 0.5em;
-        box-shadow: 2px 3px 7px 2px rgba(0, 0, 0, 0.02);
-    }
-    .jjfont {
-        font-family: {{ fontname }}, 'Microsoft YaHei', PingFangSC-Regular, HelveticaNeue-Light, 'Helvetica Neue Light', sans-serif !important;;
-    }
-    @font-face {
-        font-family: {{ fontname }};
-        src: url('http://static.jjwxc.net/tmp/fonts/{{ fontname }}.woff2?h=my.jjwxc.net') format('woff2');
-    }
-    </style>
-</head>
-<body>
-    <div class="main">
-        <h1>{{ fontname }}</h1>
-        <div>
-            <table>
-            <thead>
-                <tr>
-                <th>晋江字符（编码）</th>
-                <th>晋江字符（渲染）</th>
-                <th>通用字符</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for jjdict in jjdicts %}
-                <tr>
-                <td>{{ jjdict.ord|e }}</td>
-                <td class="jjfont">{{ jjdict.jjcode|e }}</td>
-                <td>{{ jjdict.unicode|e }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-            </table>
-        </div>
-    </div>
-</body>
-</html>''')
+        htmlTemplate = Env.get_template('font.html.j2')
 
         jjdicts = []
         for k in tablesDict:
@@ -490,13 +435,13 @@ def bundle() -> None:
 
         return bundleJSON
 
-    def saveTS() -> None:
+    def saveTS(bundleJSON) -> None:
         """
         将 tables 目录下所有JSON文件打包为Typescript模块文件。
         """
         ts = 'export interface jjwxcFontTable {[index: string]: string;} ' \
              'interface jjwxcFontTables {[index: string]: jjwxcFontTable;} ' \
-             f'export const jjwxcFontTables: jjwxcFontTables = {json.dumps(bundleDict)}'
+             f'export const jjwxcFontTables: jjwxcFontTables = {json.dumps(bundleJSON)}'
         with open(os.path.join(DistDir, 'bundle.ts'), 'w') as fp:
             fp.write(ts)
 
@@ -514,11 +459,14 @@ def bundle() -> None:
             dst = os.path.join(docsDir, f'{fontname}.html')
             shutil.copy(src, dst)
 
-        index = Template('''''')
+        indexTemplate = Env.get_template('index.html.j2')
+        indexText = indexTemplate.render(fontnames=fontnames)
+        with open(os.path.join(docsDir, "index.html"), 'w') as f:
+            f.write(indexText)
 
     jsonFiles = list(filter(lambda x: x.endswith('.json'), os.listdir(TablesDir)))
     bundleDict = saveJSON()
-    saveTS()
+    saveTS(bundleDict)
     githubPage()
 
 
@@ -527,7 +475,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
-    parser = argparse.ArgumentParser(description="晋江反爬字体破解辅助工具。")
+    parser = argparse.ArgumentParser(description="晋江自定义字体破解辅助工具。")
     parser.add_argument('--all', action='store_true', help="匹配所有fonts目录下的woff2字体文件。")
     parser.add_argument('--new', action='store_true', help="匹配fonts目录下新woff2字体。")
     parser.add_argument('--bundle', action='store_true', help="打包tables目录下所有json文件。")

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html;charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer" />
+    <title>晋江文学城自定义字体对照表</title>
+    <style>
+      body {
+        background-color: #f0f0f2;
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI",
+          "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      }
+      h1 {
+        text-align: center;
+      }
+      div.main {
+        width: 600px;
+        margin: 5em auto;
+        padding: 2em;
+        background-color: #fdfdff;
+        border-radius: 0.5em;
+        box-shadow: 2px 3px 7px 2px rgba(0, 0, 0, 0.02);
+      }
+      .section {
+        margin-top: 1.5em;
+        display: grid;
+        grid-template-columns: 30% 30% 30%;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="main">
+      <h1>晋江文学城自定义字体对照表</h1>
+      <div class="section">
+        {% for fontname in fontnames %}
+        <div>
+          <a href="{{ fontname }}.html">{{ fontname }}</a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </body>
+</html>
