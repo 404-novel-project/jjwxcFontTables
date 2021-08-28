@@ -87,12 +87,12 @@ def listTTF(ttf: ttFont.TTFont) -> list[str]:
     """
     输入字体文件，输出该字体文件下所有字符。
     """
-    chars = []
+    chars = set()
     for x in ttf["cmap"].tables:
         for y in x.cmap.items():
             char_unicode = chr(y[0])
-            chars.append(char_unicode)
-    return chars
+            chars.add(char_unicode)
+    return list(chars)
 
 
 @lru_cache()
