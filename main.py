@@ -94,7 +94,7 @@ def listTTF(ttf: ttFont.TTFont) -> list[str]:
     """
     输入字体文件，输出该字体文件下所有字符。
     """
-    return list(map(lambda x: chr(x), ttf.getBestCmap().keys()))
+    return list(set(map(lambda x: chr(x), ttf.getBestCmap().keys())))
 
 
 @lru_cache()
