@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import shutil
 import sys
 import tempfile
 from functools import lru_cache
@@ -14,9 +15,9 @@ from fontTools.ttLib import woff2, ttFont
 from jinja2 import Template
 
 PWD: str = os.path.abspath(os.path.dirname(__file__))
-FontsDir = os.path.join(PWD, 'fonts')
-TablesDir = os.path.join(PWD, 'tables')
-DistDir = os.path.join(PWD, 'dist')
+FontsDir: str = os.path.join(PWD, 'fonts')
+TablesDir: str = os.path.join(PWD, 'tables')
+DistDir: str = os.path.join(PWD, 'dist')
 
 # Setting
 SIZE: int = 228
@@ -72,9 +73,10 @@ def compare(image1: ImageDraw, image2: ImageDraw) -> float:
     """
     输入两字体图像，输出差异度。
     """
-    array1 = np.asarray(image1) / 255
-    array2 = np.asarray(image2) / 255
-    diff = (array1 - array2).var()
+    array1 = np.asarray(image1.convert('1'))
+    array2 = np.asarray(image2.convert('1'))
+    diff_array: np.ndarray = array1 ^ array2
+    diff = np.count_nonzero(diff_array) / np.multiply(*diff_array.shape)
     return diff
 
 
@@ -178,10 +180,7 @@ def saveFontFile(fontname: str) -> bytes:
     return font
 
 
-def getJJimageHashs(fontname: str) -> tuple[dict[str, imagehash.ImageHash], ImageFont.FreeTypeFont]:
-    """
-    获取指定名称晋江字体的ImageHash字典。
-    """
+def loadJJFont(fontname: str) -> tuple[ImageFont.FreeTypeFont, ttFont.TTFont]:
     fontPath = os.path.join(FontsDir, "{}.woff2".format(fontname))
     if not os.path.exists(fontPath):
         try:
@@ -194,10 +193,84 @@ def getJJimageHashs(fontname: str) -> tuple[dict[str, imagehash.ImageHash], Imag
         tmp.seek(0)
         fontTTF = ImageFont.truetype(tmp, SIZE - 5, encoding="utf-8")
         ttf = ttFont.TTFont(tmp)
+    return fontTTF, ttf
 
+
+def getJJimageHashs(fontname: str) -> tuple[dict[str, imagehash.ImageHash], ImageFont.FreeTypeFont]:
+    """
+    获取指定名称晋江字体的ImageHash字典。
+    """
+    fontTTF, ttf = loadJJFont(fontname)
     keys = listTTF(ttf)
     hashs = list(map(lambda x: HashFunc(draw(x, fontTTF), hash_size=HashSize, mean=HashMeanFunc), keys))
     return dict(zip(keys, hashs)), fontTTF
+
+
+def patchJJFontResult(fontname: str, jjFontTableDict: dict[str, str]) -> dict[str, str]:
+    """
+    对自动识别的晋江字符对照表进行一些修正。
+    """
+
+    def common_replace(tableDict: dict[str, str]) -> dict[str, str]:
+        """
+        通用替换
+        """
+
+        def replace(x):
+            r = {
+                "杲": "果",
+                "曼": "最"
+            }
+            rk = r.keys()
+            if x in rk:
+                return r[x]
+            else:
+                return x
+
+        k = tableDict.keys()
+        v = tableDict.values()
+        v_patch = list(map(replace, v))
+        return dict(zip(k, v_patch))
+
+    def patch_JI_YI(tableDict: dict[str, str]) -> dict[str, str]:
+        """
+        修正已己错识
+        """
+
+        def cmp_JI_YI(x: str) -> str:
+            """
+            比较已己
+            """
+            targetFont = 'jjwxcfont_0055y'
+            fontTTF, ttf = loadJJFont(targetFont)
+            YI = '\ue09a'
+            JI = '\ue13e'
+
+            JJFontTTF, jjTtf = loadJJFont(fontname)
+            X_img = draw(x, JJFontTTF)
+            YI_img = draw(YI, fontTTF)
+            JI_img = draw(JI, fontTTF)
+            YI_diff = compare(YI_img, X_img)
+            JI_diff = compare(JI_img, X_img)
+
+            if YI_diff < JI_diff:
+                return "已"
+            else:
+                return "己"
+
+        JI_list = list(filter(lambda kvt: kvt[1] == "己", tableDict.items()))
+        if len(JI_list) > 1:
+            for kv in JI_list:
+                k = kv[0]
+                v = cmp_JI_YI(k)
+                tableDict[k] = v
+            return tableDict
+        else:
+            return tableDict
+
+    _dict = common_replace(jjFontTableDict)
+    _dict = patch_JI_YI(_dict)
+    return _dict
 
 
 def matchJJFont(fontname: str) -> dict[str, str]:
@@ -230,27 +303,6 @@ def matchJJFont(fontname: str) -> dict[str, str]:
                         mdiff2 = diff2
         return mkey
 
-    def patch(jjFontTableDict: dict[str, str]) -> dict[str, str]:
-        """
-        对自动识别的晋江字符对照表进行一些修正。
-        """
-
-        def replace(x):
-            r = {
-                "杲": "果",
-                "曼": "最"
-            }
-            rk = r.keys()
-            if x in rk:
-                return r[x]
-            else:
-                return x
-
-        k = jjFontTableDict.keys()
-        v = jjFontTableDict.values()
-        v_patch = list(map(replace, v))
-        return dict(zip(k, v_patch))
-
     FZhashsdict = getFZImageHashs()
     FZkeys = FZhashsdict.keys()
     FZhashs = FZhashsdict.values()
@@ -270,7 +322,7 @@ def matchJJFont(fontname: str) -> dict[str, str]:
         logging.debug("{}\t{}\t{}".format(fontname, ord(jjkey), mchar))
         results[jjkey] = mchar
 
-    results = patch(results)
+    results = patchJJFontResult(fontname, results)
     logging.info(f'识别字体 {fontname} 完成。')
     return results
 
@@ -422,6 +474,22 @@ def bundle() -> None:
     将 tables 目录下所有JSON文件打包为单一JSON文件以及Typescript模块文件。
     """
 
+    def saveJSON() -> dict[str, dict[str, str]]:
+        """
+        将 tables 目录下所有JSON文件打包为单一JSON文件。
+        """
+        bundleJSON = {}
+        for fname in jsonFiles:
+            fontname = fname.split('.')[0]
+            with open(os.path.join(TablesDir, fname), 'r') as f:
+                table: dict[str, str] = json.load(f)
+            bundleJSON[fontname] = table
+
+        with open(os.path.join(DistDir, 'bundle.json'), 'w') as f:
+            json.dump(bundleJSON, f)
+
+        return bundleJSON
+
     def saveTS() -> None:
         """
         将 tables 目录下所有JSON文件打包为Typescript模块文件。
@@ -432,19 +500,26 @@ def bundle() -> None:
         with open(os.path.join(DistDir, 'bundle.ts'), 'w') as fp:
             fp.write(ts)
 
+    def githubPage() -> None:
+        """
+        生成 github page 页面
+        """
+        docsDir = os.path.join(DistDir, 'docs')
+        if not os.path.exists(docsDir):
+            os.mkdir(docsDir)
+
+        fontnames = list(map(lambda x: x.split('.')[0], jsonFiles))
+        for fontname in fontnames:
+            src = os.path.join(TablesDir, f'{fontname}.html')
+            dst = os.path.join(docsDir, f'{fontname}.html')
+            shutil.copy(src, dst)
+
+        index = Template('''''')
+
     jsonFiles = list(filter(lambda x: x.endswith('.json'), os.listdir(TablesDir)))
-
-    bundleDict = {}
-    for fname in jsonFiles:
-        fontname = fname.split('.')[0]
-        with open(os.path.join(TablesDir, fname), 'r') as f:
-            table = json.load(f)
-        bundleDict[fontname] = table
-
-    with open(os.path.join(DistDir, 'bundle.json'), 'w') as f:
-        json.dump(bundleDict, f)
-
+    bundleDict = saveJSON()
     saveTS()
+    githubPage()
 
 
 if __name__ == "__main__":

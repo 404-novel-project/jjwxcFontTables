@@ -160,7 +160,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         """
         启动后端识别程序
         """
-        logging.info(f"ON_PENDING length： {len(ON_PENDING)}, WORKING_NUM: {WORKING_NUM}")
+        logging.info(f"ON_PENDING length： {len(ON_PENDING)}, WORKING_NUM: {WORKING_NUM.value}")
         if WORKING_NUM.value <= multiprocessing.cpu_count() and len(ON_PENDING) != 0:
             for fontname in ON_PENDING:
                 if fontname not in ON_WORKING:
