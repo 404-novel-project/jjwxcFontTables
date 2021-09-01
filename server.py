@@ -121,30 +121,38 @@ class RequestHandler(BaseHTTPRequestHandler):
         """
         未发现字体对照表时处理逻辑
         """
-        code = HTTPStatus.NOT_FOUND
-        shortmsg, longmsg = self.responses[code]
-
-        self.send_response(code, shortmsg)
-        self.send_header("Cache-Control", "public, max-age=600")
-
-        content = (self.error_message_format % {
-            'code': code,
-            'message': html.escape(shortmsg, quote=False),
-            'explain': html.escape(longmsg, quote=False)
-        })
-        body = content.encode('UTF-8', 'replace')
-        self.send_header("Content-Type", self.error_content_type)
-        self.send_header('Content-Length', str(len(body)))
-        self.send_cors_header()
-        self.end_headers()
-
-        if self.command != 'HEAD' and body:
-            self.wfile.write(body)
 
         # 启用后台抓取解析线程
         if fontname not in ON_PENDING and fontname not in ON_WORKING:
             ON_PENDING.append(fontname)
             self.start_backend()
+
+        # 休眠5秒
+        time.sleep(5)
+
+        font_path = os.path.join(main.TablesDir, "{}.json".format(fontname))
+        if os.path.exists(font_path):
+            self.found(font_path)
+        else:
+            code = HTTPStatus.NOT_FOUND
+            shortmsg, longmsg = self.responses[code]
+
+            self.send_response(code, shortmsg)
+            self.send_header("Cache-Control", "public, max-age=600")
+
+            content = (self.error_message_format % {
+                'code': code,
+                'message': html.escape(shortmsg, quote=False),
+                'explain': html.escape(longmsg, quote=False)
+            })
+            body = content.encode('UTF-8', 'replace')
+            self.send_header("Content-Type", self.error_content_type)
+            self.send_header('Content-Length', str(len(body)))
+            self.send_cors_header()
+            self.end_headers()
+
+            if self.command != 'HEAD' and body:
+                self.wfile.write(body)
 
     def send_cors_header(self) -> None:
         """
