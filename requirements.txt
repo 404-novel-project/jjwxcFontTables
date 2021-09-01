@@ -5,3 +5,4 @@ fonttools
 imagehash
 Jinja2
 requests
+pybloom_live

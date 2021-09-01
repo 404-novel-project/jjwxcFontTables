@@ -12,12 +12,16 @@ from http import HTTPStatus
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from typing import Optional
 
+from pybloom_live import ScalableBloomFilter
+
 import main
 
 MG: multiprocessing.managers.SyncManager = multiprocessing.Manager()
 ON_PENDING = MG.list()
 ON_WORKING = MG.list()
 WORKING_NUM = MG.Value('i', 0)
+
+NotFound = ScalableBloomFilter(mode=ScalableBloomFilter.SMALL_SET_GROWTH)
 
 
 class RequestHandler(BaseHTTPRequestHandler):
@@ -123,12 +127,12 @@ class RequestHandler(BaseHTTPRequestHandler):
         """
 
         # 启用后台抓取解析线程
-        if fontname not in ON_PENDING and fontname not in ON_WORKING:
+        if fontname not in ON_PENDING and fontname not in ON_WORKING and fontname not in NotFound:
             ON_PENDING.append(fontname)
             self.start_backend()
 
-        # 休眠5秒
-        time.sleep(5)
+            # 休眠5秒
+            time.sleep(5)
 
         font_path = os.path.join(main.TablesDir, "{}.json".format(fontname))
         if os.path.exists(font_path):
@@ -177,6 +181,9 @@ class RequestHandler(BaseHTTPRequestHandler):
                     WORKING_NUM.value = WORKING_NUM.value + 1
                     process = multiprocessing.Process(target=self.fetch_font, args=(fontname,))
                     process.start()
+                    process.join()
+                    if process.exitcode == 15:
+                        NotFound.add(fontname)
 
     def fetch_font(self, fontname: str) -> None:
         """
@@ -191,7 +198,9 @@ class RequestHandler(BaseHTTPRequestHandler):
             logging.info("识别字体 {} 共耗费 {:.2f} 秒。".format(fontname, cost_time))
             self.start_backend()
         except FileNotFoundError:
+            ON_WORKING.remove(fontname)
             WORKING_NUM.value = WORKING_NUM.value - 1
+            sys.exit(15)
 
 
 if __name__ == '__main__':
