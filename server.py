@@ -131,32 +131,40 @@ class RequestHandler(BaseHTTPRequestHandler):
             ON_PENDING.append(fontname)
             self.start_backend()
 
-            # 休眠5秒
             time.sleep(5)
+        elif fontname in ON_WORKING:
+            time.sleep(5)
+        elif fontname in ON_PENDING:
+            time.sleep(5 * len(ON_PENDING))
+        elif fontname in NotFound:
+            self.send_not_found()
 
         font_path = os.path.join(main.TablesDir, "{}.json".format(fontname))
         if os.path.exists(font_path):
             self.found(font_path)
         else:
-            code = HTTPStatus.NOT_FOUND
-            shortmsg, longmsg = self.responses[code]
+            self.send_not_found()
 
-            self.send_response(code, shortmsg)
-            self.send_header("Cache-Control", "public, max-age=600")
+    def send_not_found(self) -> None:
+        code = HTTPStatus.NOT_FOUND
+        shortmsg, longmsg = self.responses[code]
 
-            content = (self.error_message_format % {
-                'code': code,
-                'message': html.escape(shortmsg, quote=False),
-                'explain': html.escape(longmsg, quote=False)
-            })
-            body = content.encode('UTF-8', 'replace')
-            self.send_header("Content-Type", self.error_content_type)
-            self.send_header('Content-Length', str(len(body)))
-            self.send_cors_header()
-            self.end_headers()
+        self.send_response(code, shortmsg)
+        self.send_header("Cache-Control", "public, max-age=600")
 
-            if self.command != 'HEAD' and body:
-                self.wfile.write(body)
+        content = (self.error_message_format % {
+            'code': code,
+            'message': html.escape(shortmsg, quote=False),
+            'explain': html.escape(longmsg, quote=False)
+        })
+        body = content.encode('UTF-8', 'replace')
+        self.send_header("Content-Type", self.error_content_type)
+        self.send_header('Content-Length', str(len(body)))
+        self.send_cors_header()
+        self.end_headers()
+
+        if self.command != 'HEAD' and body:
+            self.wfile.write(body)
 
     def send_cors_header(self) -> None:
         """
