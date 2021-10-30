@@ -495,6 +495,9 @@ def bundle() -> None:
             dst = os.path.join(docsDir, f'{fontname}.html')
             shutil.copy(src, dst)
 
+        shutil.copy(os.path.join(DistDir, 'bundle.json'), os.path.join(docsDir, 'bundle.json'))
+        shutil.copy(os.path.join(DistDir, 'bundle.ts'), os.path.join(docsDir, 'bundle.ts'))
+
         indexTemplate = Env.get_template('index.html.j2')
         indexText = indexTemplate.render(fontnames=fontnames)
         with open(os.path.join(docsDir, "index.html"), 'w') as f:
