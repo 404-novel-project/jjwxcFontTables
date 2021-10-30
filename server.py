@@ -150,7 +150,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         shortmsg, longmsg = self.responses[code]
 
         self.send_response(code, shortmsg)
-        self.send_header("Cache-Control", "public, max-age=600")
+        self.send_header("Cache-Control", "no-store, max-age=0")
 
         content = (self.error_message_format % {
             'code': code,
