@@ -21,7 +21,7 @@ ON_PENDING = MG.list()
 ON_WORKING = MG.list()
 WORKING_NUM = MG.Value('i', 0)
 
-NotFound = ScalableBloomFilter(initial_capacity=10000, mode=ScalableBloomFilter.LARGE_SET_GROWTH)
+NotFound = ScalableBloomFilter(initial_capacity=10000, error_rate=0.00001, mode=ScalableBloomFilter.LARGE_SET_GROWTH)
 
 
 class RequestHandler(BaseHTTPRequestHandler):
