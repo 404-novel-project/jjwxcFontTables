@@ -466,6 +466,7 @@ def bundle() -> None:
                 table: dict[str, str] = json.load(f)
             bundleJSON[fontname] = table
 
+        bundleJSON = sorted(bundleJSON)
         with open(os.path.join(DistDir, 'bundle.json'), 'w') as f:
             json.dump(bundleJSON, f)
 
