@@ -491,6 +491,7 @@ def bundle() -> None:
             os.mkdir(docsDir)
 
         fontnames = list(map(lambda x: x.split('.')[0], jsonFiles))
+        fontnames = sorted(fontnames)
         for fontname in fontnames:
             src = os.path.join(TablesDir, f'{fontname}.html')
             dst = os.path.join(docsDir, f'{fontname}.html')
