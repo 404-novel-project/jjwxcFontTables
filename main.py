@@ -5,11 +5,13 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 from functools import lru_cache
+from typing import Union
 
+import httpx
 import imagehash
 import numpy as np
-import requests
 from PIL import Image, ImageDraw, ImageFont
 from fontTools.ttLib import woff2, ttFont
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -44,6 +46,11 @@ coorTableJsonPath = os.path.join(AssetsDir, "coorTable.json")
 with open(coorTableJsonPath, 'r') as frp:
     CoorTable = json.load(frp)
 del frp
+
+# print color
+# https://stackoverflow.com/questions/287871/how-to-print-colored-text-to-the-terminal
+CRED = '\33[31m'
+CGREEN = '\33[32m'
 
 
 def mkdir() -> None:
@@ -151,26 +158,50 @@ def getFZImageHashs() -> dict[str, imagehash.ImageHash]:
         return saveFZimageHashs()
 
 
-def getFontFile(fontname: str) -> bytes:
+httpClient: Union[None, httpx.Client] = None
+
+
+def getFontFile(fontname: str, retry: int = 5) -> bytes:
     """
     请求字体文件
     """
     logging.info("请求字体文件：{}".format(fontname))
-    url = "http://static.jjwxc.net/tmp/fonts/{}.woff2?h=my.jjwxc.net".format(fontname)
+    url = "https://static.jjwxc.net/tmp/fonts/{}.woff2?h=my.jjwxc.net".format(fontname)
     headers = {
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:91.0) Gecko/20100101 Firefox/91.0",
         "Accept": "application/font-woff2;q=1.0,application/font-woff;q=0.9,*/*;q=0.8",
         "Accept-Language": "zh-CN,zh;q=0.5",
         "Pragma": "no-cache",
         "Cache-Control": "no-cache",
-        "Referer": "http://my.jjwxc.net/",
-        "Origin": "http://my.jjwxc.net"
+        "Referer": "https://my.jjwxc.net/",
+        "Origin": "https://my.jjwxc.net"
     }
-    resp = requests.get(url, headers=headers)
+    global httpClient
+    if httpClient is None:
+        httpClient = httpx.Client(headers=headers, http2=True)
+
+    resp: Union[None, httpx.Response] = None
+    error: Union[None, Exception] = None
+    while retry > 0:
+        try:
+            resp = httpClient.get(url)
+            retry = 0
+        except httpx.TransportError as error:
+            logging.error(error)
+            time.sleep(6 - retry)
+            retry = retry - 1
+            pass
+    if resp is None:
+        raise error
+
     if resp.status_code == 404:
-        logging.error("未发现字体文件：{}".format(fontname))
+        logging.error(CRED + "未发现字体文件：{}".format(fontname))
         raise FileNotFoundError
     return resp.content
+
+
+def getFontPath(fontname: str) -> str:
+    return os.path.join(FontsDir, "{}.woff2".format(fontname))
 
 
 def saveFontFile(fontname: str) -> bytes:
@@ -178,7 +209,7 @@ def saveFontFile(fontname: str) -> bytes:
     请求并保存字体文件
     """
     font = getFontFile(fontname)
-    fontPath = os.path.join(FontsDir, "{}.woff2".format(fontname))
+    fontPath = getFontPath(fontname)
     with open(fontPath, 'wb') as f:
         logging.info("正在保存字体：{}".format(fontname))
         f.write(font)
@@ -323,8 +354,8 @@ def matchJJFont(fontname: str) -> dict[str, str]:
             if len(a) != len(b):
                 return False
             found = True
-            for i in range(len(a)):
-                if abs(a[i][0] - b[i][0]) > fuzz or abs(a[i][1] - b[i][1]) > fuzz:
+            for ii in range(len(a)):
+                if abs(a[ii][0] - b[ii][0]) > fuzz or abs(a[ii][1] - b[ii][1]) > fuzz:
                     found = False
                     break
             return found
@@ -366,7 +397,15 @@ def matchJJFont(fontname: str) -> dict[str, str]:
     return results
 
 
-def saveJJFont(fontname: str, tablesDict: dict[str, str], tablesFolderPath: str = TablesDir) -> None:
+def getFontJsonPath(fontname: str) -> str:
+    return os.path.join(TablesDir, fontname + '.json')
+
+
+def getHtmlPath(fontname: str) -> str:
+    return os.path.join(TablesDir, fontname + '.html')
+
+
+def saveJJFont(fontname: str, tablesDict: dict[str, str]) -> None:
     """
     将晋江字体对照表保存为JSON文件、HTML文件。
     """
@@ -375,7 +414,7 @@ def saveJJFont(fontname: str, tablesDict: dict[str, str], tablesFolderPath: str 
         """
         将晋江字体对照表保存为JSON文件。
         """
-        fontJsonPath = os.path.join(tablesFolderPath, fontname + '.json')
+        fontJsonPath = getFontJsonPath(fontname)
         with open(fontJsonPath, 'w') as f:
             json.dump(tablesDict, f, sort_keys=True, indent=4)
 
@@ -393,7 +432,7 @@ def saveJJFont(fontname: str, tablesDict: dict[str, str], tablesFolderPath: str 
 
         htmlText = htmlTemplate.render(fontname=fontname, jjdicts=jjdicts)
 
-        htmlPath = os.path.join(tablesFolderPath, fontname + '.html')
+        htmlPath = getHtmlPath(fontname)
         with open(htmlPath, 'w') as f:
             f.write(htmlText)
 
@@ -460,13 +499,17 @@ def bundle() -> None:
         将 tables 目录下所有JSON文件打包为单一JSON文件。
         """
         bundleJSON = {}
+        fontTable = dict[str, str]
         for fname in jsonFiles:
             fontname = fname.split('.')[0]
             with open(os.path.join(TablesDir, fname), 'r') as f:
-                table: dict[str, str] = json.load(f)
+                table: fontTable = json.load(f)
             bundleJSON[fontname] = table
 
-        bundleJSON = dict(sorted(bundleJSON.items(), key=lambda x: x[0].lower()))
+        # noinspection PyTypeChecker
+        bundleJSON = dict(
+            sorted(bundleJSON.items(), key=lambda x: x[0].lower())
+        )
         with open(os.path.join(DistDir, 'bundle.json'), 'w') as f:
             json.dump(bundleJSON, f)
 

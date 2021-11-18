@@ -4,5 +4,5 @@ brotli
 fonttools
 imagehash
 Jinja2
-requests
+httpx[http2]
 pybloom_live
