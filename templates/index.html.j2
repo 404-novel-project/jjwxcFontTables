@@ -36,11 +36,11 @@
     <div class="main">
       <h1>晋江文学城自定义字体对照表</h1>
       <div class="section">
-        {% for fontname in fontnames %}
+        {%- for fontname in fontnames -%}
         <div>
           <a href="{{ fontname }}.html">{{ fontname }}</a>
         </div>
-        {% endfor %}
+        {%- endfor -%}
       </div>
     </div>
   </body>

@@ -44,13 +44,13 @@
             </tr>
           </thead>
           <tbody>
-            {% for jjdict in jjdicts %}
+            {%- for jjdict in jjdicts -%}
             <tr>
               <td>{{ jjdict.ord|e }}</td>
               <td class="jjfont">{{ jjdict.jjcode|e }}</td>
               <td>{{ jjdict.unicode|e }}</td>
             </tr>
-            {% endfor %}
+            {%- endfor -%}
           </tbody>
         </table>
       </div>
