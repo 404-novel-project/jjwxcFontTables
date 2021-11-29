@@ -9,6 +9,7 @@ import time
 from functools import lru_cache
 from typing import Union
 
+import h2.exceptions
 import httpx
 import imagehash
 import numpy as np
@@ -161,7 +162,7 @@ def getFZImageHashs() -> dict[str, imagehash.ImageHash]:
 httpClient: Union[None, httpx.Client] = None
 
 
-def getFontFile(fontname: str, retry: int = 5) -> bytes:
+def getFontFile(fontname: str, retry: int = 5) -> Union[bytes, None]:
     """
     请求字体文件
     """
@@ -181,23 +182,28 @@ def getFontFile(fontname: str, retry: int = 5) -> bytes:
         httpClient = httpx.Client(headers=headers, http2=True)
 
     resp: Union[None, httpx.Response] = None
-    error: Union[None, Exception] = None
     while retry > 0:
         try:
             resp = httpClient.get(url)
-            retry = 0
-        except httpx.TransportError as error:
+
+            if resp.status_code == 404:
+                logging.error(CRED + "未发现字体文件：{}".format(fontname))
+                raise FileNotFoundError
+
+            if 200 <= resp.status_code < 300:
+                retry = 0
+            else:
+                time.sleep(6 - retry)
+                retry = retry - 1
+        except (httpx.TransportError, h2.exceptions.ProtocolError) as error:
             logging.error(error)
             time.sleep(6 - retry)
             retry = retry - 1
-            pass
-    if resp is None:
-        raise error
 
-    if resp.status_code == 404:
-        logging.error(CRED + "未发现字体文件：{}".format(fontname))
-        raise FileNotFoundError
-    return resp.content
+    if resp is not None:
+        return resp.content
+    else:
+        return None
 
 
 def getFontPath(fontname: str) -> str:

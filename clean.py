@@ -1,5 +1,8 @@
-import os
 import hashlib
+import logging
+import os
+import sys
+from typing import Union
 
 import main
 
@@ -11,24 +14,31 @@ def getFontFileSha1(fontname: str) -> str:
         return sha1.hexdigest()
 
 
-def getRemoteFontFileSha1(fontname: str) -> str:
+def getRemoteFontFileSha1(fontname: str) -> Union[str, None]:
     fontContent = main.getFontFile(fontname)
-    sha1 = hashlib.sha1(fontContent)
-    return sha1.hexdigest()
+    if fontContent is not None:
+        sha1 = hashlib.sha1(fontContent)
+        return sha1.hexdigest()
+    else:
+        return None
 
 
 def compareHash(fontname: str) -> bool:
     hashLocal = getFontFileSha1(fontname)
     try:
         hashRemote = getRemoteFontFileSha1(fontname)
-        match = hashLocal == hashRemote
+        if hashRemote is not None:
+            match = hashLocal == hashRemote
+        else:
+            logging.warning(main.CRED + 'Get Font {} from Remote failed!'.format(fontname))
+            match = True
     except FileNotFoundError as e:
-        print(main.CRED + 'Font {} not Found on Remote!'.format(fontname))
+        logging.warning(main.CRED + 'Font {} not Found on Remote!'.format(fontname))
         match = False
     if match:
-        print(main.CGREEN + 'Font: {} consistent!'.format(fontname))
+        logging.info(main.CGREEN + 'Font: {} consistent!'.format(fontname))
     else:
-        print(main.CRED + 'Fontname: {} inconsistent!'.format(fontname))
+        logging.warning(main.CRED + 'Fontname: {} inconsistent!'.format(fontname))
     return match
 
 
@@ -39,10 +49,12 @@ def deleteFont(fontname: str) -> None:
     os.remove(fontPath)
     os.remove(jsonPath)
     os.remove(htmpPath)
-    print(main.CRED + 'Font {} has been deleted!'.format(fontname))
+    logging.warning(main.CRED + 'Font {} has been deleted!'.format(fontname))
 
 
 if __name__ == '__main__':
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+
     fontnames: list[str] = list(
         map(lambda x: x.replace('.woff2', ''), os.listdir(main.FontsDir))
     )
