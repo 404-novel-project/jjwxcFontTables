@@ -46,9 +46,12 @@ def deleteFont(fontname: str) -> None:
     fontPath = main.getFontPath(fontname)
     jsonPath = main.getFontJsonPath(fontname)
     htmpPath = main.getHtmlPath(fontname)
-    os.remove(fontPath)
-    os.remove(jsonPath)
-    os.remove(htmpPath)
+    try:
+        os.remove(fontPath)
+        os.remove(jsonPath)
+        os.remove(htmpPath)
+    except FileNotFoundError as e:
+        logging.error(e)
     logging.warning(main.CRED + 'Font {} has been deleted!'.format(fontname))
 
 
