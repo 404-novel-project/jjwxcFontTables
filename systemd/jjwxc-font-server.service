@@ -1,0 +1,15 @@
+[Unit]
+Description=JJWXC Remote Font Backend.
+Wants=network.target
+
+[Service]
+EnvironmentFile=-/etc/environment
+ExecStart=/opt/jjwxcFontTables/venv/bin/python server.py
+Restart=on-failure
+WorkingDirectory=/opt/jjwxcFontTables/
+TimeoutStopSec=30
+Type=simple
+User=jjwxc
+
+[Install]
+WantedBy=multi-user.target
