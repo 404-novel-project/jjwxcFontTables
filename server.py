@@ -128,19 +128,15 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         # 启用后台抓取解析线程
         if fontname in ON_WORKING:
-            self.send_not_found()
+            return self.send_not_found()
         if fontname in ON_PENDING:
-            self.send_not_found()
+            return self.send_not_found()
         if fontname in NotFound:
-            self.send_not_found()
+            return self.send_not_found()
 
+        self.send_not_found()
         ON_PENDING.append(fontname)
         self.start_backend()
-        font_path = os.path.join(main.TablesDir, "{}.json".format(fontname))
-        if os.path.exists(font_path):
-            self.found(font_path)
-        else:
-            self.send_not_found()
 
     def send_not_found(self) -> None:
         code = HTTPStatus.NOT_FOUND
