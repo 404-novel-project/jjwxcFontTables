@@ -127,18 +127,15 @@ class RequestHandler(BaseHTTPRequestHandler):
         """
 
         # 启用后台抓取解析线程
-        if fontname not in ON_PENDING and fontname not in ON_WORKING and fontname not in NotFound:
-            ON_PENDING.append(fontname)
-            self.start_backend()
-
-            time.sleep(5)
-        elif fontname in ON_WORKING:
-            time.sleep(5)
-        elif fontname in ON_PENDING:
-            time.sleep(5 * len(ON_PENDING))
-        elif fontname in NotFound:
+        if fontname in ON_WORKING:
+            self.send_not_found()
+        if fontname in ON_PENDING:
+            self.send_not_found()
+        if fontname in NotFound:
             self.send_not_found()
 
+        ON_PENDING.append(fontname)
+        self.start_backend()
         font_path = os.path.join(main.TablesDir, "{}.json".format(fontname))
         if os.path.exists(font_path):
             self.found(font_path)
