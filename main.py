@@ -14,7 +14,7 @@ import httpx
 import imagehash
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-from fontTools.ttLib import woff2, ttFont
+from fontTools.ttLib import woff2, ttFont, TTLibError
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 PWD: str = os.path.abspath(os.path.dirname(__file__))
@@ -216,6 +216,8 @@ def saveFontFile(fontname: str) -> bytes:
     """
     font = getFontFile(fontname)
     fontPath = getFontPath(fontname)
+    if font is None:
+        raise ValueError("fetch fonts failed!")
     with open(fontPath, 'wb') as f:
         logging.info("正在保存字体：{}".format(fontname))
         f.write(font)
@@ -231,10 +233,16 @@ def loadJJFont(fontname: str) -> tuple[ImageFont.FreeTypeFont, ttFont.TTFont]:
             raise e
 
     with tempfile.TemporaryFile() as tmp:
-        woff2.decompress(fontPath, tmp)
-        tmp.seek(0)
-        fontTTF = ImageFont.truetype(tmp, SIZE - 5, encoding="utf-8")
-        ttf = ttFont.TTFont(tmp)
+        try:
+            woff2.decompress(fontPath, tmp)
+            tmp.seek(0)
+            fontTTF = ImageFont.truetype(tmp, SIZE - 5, encoding="utf-8")
+            ttf = ttFont.TTFont(tmp)
+        except TTLibError as e:
+            logging.error(e)
+            os.remove(fontPath)
+            raise e
+
     return fontTTF, ttf
 
 

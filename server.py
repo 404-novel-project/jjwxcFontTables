@@ -202,6 +202,11 @@ class RequestHandler(BaseHTTPRequestHandler):
             ON_WORKING.remove(fontname)
             WORKING_NUM.value = WORKING_NUM.value - 1
             sys.exit(15)
+        except BaseException as e:
+            logging.error(e)
+            ON_WORKING.remove(fontname)
+            WORKING_NUM.value = WORKING_NUM.value - 1
+            sys.exit(1)
 
 
 if __name__ == '__main__':
