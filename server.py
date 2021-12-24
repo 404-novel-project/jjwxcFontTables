@@ -177,14 +177,21 @@ class RequestHandler(BaseHTTPRequestHandler):
         if WORKING_NUM.value <= multiprocessing.cpu_count() and len(ON_PENDING) != 0:
             for fontname in ON_PENDING:
                 if fontname not in ON_WORKING:
-                    ON_WORKING.append(fontname)
-                    ON_PENDING.remove(fontname)
-                    WORKING_NUM.value = WORKING_NUM.value + 1
-                    process = multiprocessing.Process(target=self.fetch_font, args=(fontname,))
-                    process.start()
-                    process.join()
-                    if process.exitcode == 15:
-                        NotFound.add(fontname)
+                    try:
+                        ON_PENDING.remove(fontname)
+                        ON_WORKING.append(fontname)
+                        WORKING_NUM.value = WORKING_NUM.value + 1
+                        process = multiprocessing.Process(target=self.fetch_font, args=(fontname,))
+                        process.start()
+                        process.join()
+                        if process.exitcode == 15:
+                            NotFound.add(fontname)
+                    except ValueError as e:
+                        logging.error(e)
+                        WORKING_NUM.value = WORKING_NUM.value - 1
+                        if fontname in ON_WORKING:
+                            ON_WORKING.remove(fontname)
+
 
     def fetch_font(self, fontname: str) -> None:
         """
