@@ -1,0 +1,14 @@
+[Unit]
+Description=Clean JJWXC Fonts
+Wants=network.target
+
+[Service]
+EnvironmentFile=-/etc/environment
+ExecStart=/opt/jjwxcFontTables/venv/bin/python clean.py
+WorkingDirectory=/opt/jjwxcFontTables/
+Type=oneshot
+Nice=19
+User=jjwxc
+
+[Install]
+WantedBy=multi-user.target

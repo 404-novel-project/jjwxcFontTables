@@ -1,0 +1,11 @@
+[Unit]
+Description=Clean JJWXC Fonts Daily.
+Wants=network.target
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=12h
+Persistent=true
+
+[Install]
+WantedBy=multi-user.target
