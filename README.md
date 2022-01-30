@@ -22,7 +22,7 @@ optional arguments:
 
 如需打包版本，请切换至 gh-pages 分支。`bundle.json` 即为打包后版本。
 
-在线查看晋江自定义字体对照表：https://yingziwu.github.io/jjwxcFontTables/
+在线查看晋江自定义字体对照表：https://404-novel-project.github.io/jjwxcFontTables/
 
 ## 实现思路
 
