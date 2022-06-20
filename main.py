@@ -421,6 +421,40 @@ def getHtmlPath(fontname: str) -> str:
     return os.path.join(TablesDir, fontname + '.html')
 
 
+def genJJTableHtml(fontname: str, tablesDict: dict[str, str]):
+    """
+    生成晋江字体对照表HTML
+    """
+    htmlTemplate = Env.get_template('font.html.j2')
+
+    jjdicts = []
+    for k in tablesDict:
+        jjdict = {'ord': str(hex(ord(k))).replace('0x', 'U+'), 'jjcode': k, 'unicode': tablesDict[k]}
+        jjdicts.append(jjdict)
+
+    jjdicts.sort(key=lambda x: x['jjcode'])
+    htmlText = htmlTemplate.render(fontname=fontname, jjdicts=jjdicts)
+    return htmlText
+
+
+def reGenHtml():
+    """
+    重新生成 HTML 文件
+    """
+    fontJsonList = set(
+        map(lambda x: x.split('.')[0],
+            filter(lambda x: x.endswith('.json'), os.listdir(TablesDir))
+            )
+    )
+    for fontname in fontJsonList:
+        with open(getFontJsonPath(fontname), 'r') as f:
+            tablesDict = json.load(f)
+        htmlText = genJJTableHtml(fontname, tablesDict)
+        htmlPath = getHtmlPath(fontname)
+        with open(htmlPath, 'w') as f:
+            f.write(htmlText)
+
+
 def saveJJFont(fontname: str, tablesDict: dict[str, str]) -> None:
     """
     将晋江字体对照表保存为JSON文件、HTML文件。
@@ -438,16 +472,7 @@ def saveJJFont(fontname: str, tablesDict: dict[str, str]) -> None:
         """
         将晋江字体对照表保存为HTML文件。
         """
-        # noinspection PyPep8
-        htmlTemplate = Env.get_template('font.html.j2')
-
-        jjdicts = []
-        for k in tablesDict:
-            jjdict = {'ord': str(hex(ord(k))).replace('0x', 'U+'), 'jjcode': k, 'unicode': tablesDict[k]}
-            jjdicts.append(jjdict)
-
-        htmlText = htmlTemplate.render(fontname=fontname, jjdicts=jjdicts)
-
+        htmlText = genJJTableHtml(fontname, tablesDict)
         htmlPath = getHtmlPath(fontname)
         with open(htmlPath, 'w') as f:
             f.write(htmlText)
@@ -616,6 +641,7 @@ if __name__ == "__main__":
     parser.add_argument('--all', action='store_true', help="匹配所有fonts目录下的woff2字体文件。")
     parser.add_argument('--new', action='store_true', help="匹配fonts目录下新woff2字体。")
     parser.add_argument('--bundle', action='store_true', help="打包tables目录下所有json文件。")
+    parser.add_argument('--rehtml', action='store_true', help="重新生成HTML文件")
     parser.add_argument('--font', help="匹配指字名称字体文件。 例始：--font jjwxcfont_00gxm")
     args = parser.parse_args()
 
@@ -625,5 +651,7 @@ if __name__ == "__main__":
         matchNew()
     elif args.bundle:
         bundle()
+    elif args.rehtml:
+        reGenHtml()
     elif args.font:
         JJFont(args.font)
