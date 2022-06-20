@@ -27,12 +27,12 @@ AssetsDir: str = os.path.join(PWD, "assets")
 SIZE: int = 228
 W, H = (SIZE, SIZE)
 
-# FZFont
-FZFontTTFPath: str = os.path.join(AssetsDir, "FZLanTingHei-M-GBK.ttf")
-FZFontTTF: ImageFont.FreeTypeFont = ImageFont.truetype(FZFontTTFPath, SIZE, encoding="utf-8")
+# StdFont
+StdFontTTFPath: str = os.path.join(AssetsDir, "SourceHanSans.ttc")
+StdFontTTF: ImageFont.FreeTypeFont = ImageFont.truetype(StdFontTTFPath, SIZE, index=12, encoding="utf-8")
 
-# FZHashs
-FZHashPath: str = os.path.join(AssetsDir, "FZLanTingHei-M-GBK-Hash-Table.json")
+# StdHashs
+StdHashPath: str = os.path.join(AssetsDir, "SourceHanSans.json")
 
 # ImageHash
 HashSize: int = 16
@@ -45,7 +45,7 @@ Env: Environment = Environment(loader=FileSystemLoader(os.path.join(PWD, 'templa
 # coorTable
 coorTableJsonPath = os.path.join(AssetsDir, "coorTable.json")
 with open(coorTableJsonPath, 'r') as frp:
-    CoorTable = json.load(frp)
+    CoorTable: [[str, [[int, int]]]] = json.load(frp)
 del frp
 
 # print color
@@ -66,11 +66,11 @@ def mkdir() -> None:
 mkdir()
 
 
-def drawFZ(character: str) -> ImageDraw:
+def drawStd(character: str) -> ImageDraw:
     """
-    输入字符，输出方正兰亭黑字体绘制结果。
+    输入字符，输出参考字体绘制结果。
     """
-    return draw(character, FZFontTTF)
+    return draw(character, StdFontTTF)
 
 
 @lru_cache(maxsize=1024)
@@ -106,27 +106,27 @@ def listTTF(ttf: ttFont.TTFont) -> list[str]:
 
 
 @lru_cache()
-def getFZImageHashs() -> dict[str, imagehash.ImageHash]:
+def getStdImageHashs() -> dict[str, imagehash.ImageHash]:
     """
-    获取方正兰亭黑字体ImageHash字典。
+    获取参考字体ImageHash字典。
     """
 
-    def genFZimageHashs():
+    def genStdimageHashs():
         """
-        生成方正兰亭黑字体ImageHash字典。
+        生成参考字体ImageHash字典。
         """
-        ttf = ttFont.TTFont(FZFontTTFPath)
+        ttf = ttFont.TTFont(StdFontTTFPath, fontNumber=0)
         chars = listTTF(ttf)
 
         keys = list(filter(lambda x: 19967 < ord(x) < 40870, chars))
-        hashs = list(map(lambda x: HashFunc(drawFZ(x), hash_size=HashSize, mean=HashMeanFunc), keys))
+        hashs = list(map(lambda x: HashFunc(drawStd(x), hash_size=HashSize, mean=HashMeanFunc), keys))
         return dict(zip(keys, hashs))
 
-    def loadFZimageHashs():
+    def loadStdimageHashs():
         """
-        从JSON文件载入方正兰亭黑字体ImageHash字典。
+        从JSON文件载入参考字体ImageHash字典。
         """
-        with open(FZHashPath, 'r') as f:
+        with open(StdHashPath, 'r') as f:
             _hashsdict_save: dict[str, str] = json.load(f)
         _keys = _hashsdict_save.keys()
         _hashs_str = _hashsdict_save.values()
@@ -135,28 +135,28 @@ def getFZImageHashs() -> dict[str, imagehash.ImageHash]:
         hashsdict = dict(zip(_keys, _hashs))
         return hashsdict
 
-    def saveFZimageHashs():
+    def saveStdimageHashs():
         """
-        将方正兰亭黑字体ImageHash字典保存为JSON文件。
+        将参考字体ImageHash字典保存为JSON文件。
         """
-        hashsdict = genFZimageHashs()
+        hashsdict = genStdimageHashs()
         _keys = hashsdict.keys()
         _hashs = hashsdict.values()
 
         # save to json
         _hashs_str = list(map(lambda x: str(x), _hashs))
         _hashsdict_save = dict(zip(_keys, _hashs_str))
-        with open(FZHashPath, 'w') as f:
+        with open(StdHashPath, 'w') as f:
             json.dump(_hashsdict_save, f)
         return hashsdict
 
-    if os.path.exists(FZHashPath):
+    if os.path.exists(StdHashPath):
         try:
-            return loadFZimageHashs()
+            return loadStdimageHashs()
         except json.decoder.JSONDecodeError:
-            return saveFZimageHashs()
+            return saveStdimageHashs()
     else:
-        return saveFZimageHashs()
+        return saveStdimageHashs()
 
 
 httpClient: Union[None, httpx.Client] = None
@@ -236,7 +236,7 @@ def loadJJFont(fontname: str) -> tuple[ImageFont.FreeTypeFont, ttFont.TTFont]:
         try:
             woff2.decompress(fontPath, tmp)
             tmp.seek(0)
-            fontTTF = ImageFont.truetype(tmp, SIZE - 5, encoding="utf-8")
+            fontTTF = ImageFont.truetype(tmp, SIZE, encoding="utf-8")
             ttf = ttFont.TTFont(tmp)
         except TTLibError as e:
             logging.error(e)
@@ -333,8 +333,8 @@ def matchJJFont(fontname: str) -> dict[str, str]:
         """
         输入晋江字符以及晋江字符所对应ImageHash，返回最匹配的普通字符。
         """
-        diffs = list(map(lambda fzhash: fzhash - ihash, FZhashs))
-        diffs_dict = dict(zip(FZkeys, diffs))
+        diffs = list(map(lambda stdhash: stdhash - ihash, Stdhashs))
+        diffs_dict = dict(zip(Stdkeys, diffs))
 
         mkey = None
         mdiff = None
@@ -344,17 +344,17 @@ def matchJJFont(fontname: str) -> dict[str, str]:
             if mkey is None:
                 mkey = k
                 mdiff = diff
-                mdiff2 = compare(draw(jj, JJFontTTF), drawFZ(k))
+                mdiff2 = compare(draw(jj, JJFontTTF), drawStd(k))
             else:
                 if diff <= mdiff:
-                    diff2 = compare(draw(jj, JJFontTTF), drawFZ(k))
+                    diff2 = compare(draw(jj, JJFontTTF), drawStd(k))
                     if diff2 < mdiff2:
                         mkey = k
                         mdiff = diff
                         mdiff2 = diff2
         return mkey
 
-    def quickMatch(jj: str, ttf: ttFont.TTFont) -> str:
+    def quickMatch(jj: str, ttf: ttFont.TTFont) -> Union[str, None]:
         """
         通过直接比较字体快速匹配
         """
@@ -375,14 +375,15 @@ def matchJJFont(fontname: str) -> dict[str, str]:
             return found
 
         jjCoord = getCoord(jj, ttf)
-        for stdKey in CoorTable:
-            stdCoord = CoorTable[stdKey]
+        for obj in CoorTable:
+            [stdKey, stdCoord] = obj
             if is_glpyh_similar(jjCoord, stdCoord, FUZZ):
                 return stdKey
+        return None
 
-    FZhashsdict = getFZImageHashs()
-    FZkeys = FZhashsdict.keys()
-    FZhashs = FZhashsdict.values()
+    Stdhashsdict = getStdImageHashs()
+    Stdkeys = Stdhashsdict.keys()
+    Stdhashs = Stdhashsdict.values()
 
     JJhashsdict = getJJimageHashs(fontname)
     JJFontTTF, JJttf = loadJJFont(fontname)
@@ -400,8 +401,9 @@ def matchJJFont(fontname: str) -> dict[str, str]:
         if not mchar:
             logging.info(f'快速匹配失败，开始图形匹配。字体名称：{fontname}，字体编号：{hex(ord(jjkey))}')
             mchar = match(jjkey, jjhash)
-            mCoor = getCoord(mchar, JJttf)
-            CoorTable[mchar] = mCoor
+            mCoor = getCoord(jjkey, JJttf)
+            newCoor = [mchar, mCoor]
+            CoorTable.append(newCoor)
             saveCoorTable()
         logging.debug("{}\t{}\t{}".format(fontname, ord(jjkey), mchar))
         results[jjkey] = mchar
@@ -602,7 +604,7 @@ def saveCoorTable() -> None:
     保存当前 coordTable
     """
     with open(coorTableJsonPath, 'w') as f:
-        json.dump(CoorTable, f)
+        json.dump(CoorTable, f, ensure_ascii=False)
 
 
 if __name__ == "__main__":
@@ -625,4 +627,3 @@ if __name__ == "__main__":
         bundle()
     elif args.font:
         JJFont(args.font)
-

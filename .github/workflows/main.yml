@@ -10,14 +10,17 @@ jobs:
     steps:
       - name: Checkout 🛎️
         uses: actions/checkout@v2.3.1
+        with:
+          lfs: 'true'
+          submodules: 'recursive'
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install and Build 🔧
-        run: |
-          pip install -r requirements.txt &&
-          python main.py --bundle
+      - name: Install 🔧
+        run: pip install -r requirements.txt
+      - name: Build
+        run: python main.py --bundle
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@4.1.1
         with:
