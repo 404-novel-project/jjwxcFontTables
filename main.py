@@ -256,72 +256,6 @@ def getJJimageHashs(fontname: str) -> dict[str, imagehash.ImageHash]:
     return dict(zip(keys, hashs))
 
 
-def patchJJFontResult(fontname: str, jjFontTableDict: dict[str, str]) -> dict[str, str]:
-    """
-    对自动识别的晋江字符对照表进行一些修正。
-    """
-
-    def common_replace(tableDict: dict[str, str]) -> dict[str, str]:
-        """
-        通用替换
-        """
-
-        def replace(x):
-            r = {
-                "杲": "果",
-                "曼": "最",
-                "吋": "时"
-            }
-            rk = r.keys()
-            if x in rk:
-                return r[x]
-            else:
-                return x
-
-        k = tableDict.keys()
-        v = tableDict.values()
-        v_patch = list(map(replace, v))
-        return dict(zip(k, v_patch))
-
-    def patch_JI_YI(tableDict: dict[str, str]) -> dict[str, str]:
-        """
-        修正已己错识
-        """
-
-        def cmp_JI_YI(x: str) -> str:
-            """
-            比较已己
-            """
-            targetFont = 'jjwxcfont_0055y'
-            fontTTF, ttf = loadJJFont(targetFont)
-            YI = '\ue09a'
-            JI = '\ue13e'
-
-            JJFontTTF, jjTtf = loadJJFont(fontname)
-            X_img = draw(x, JJFontTTF)
-            YI_img = draw(YI, fontTTF)
-            JI_img = draw(JI, fontTTF)
-            YI_diff = compare(YI_img, X_img)
-            JI_diff = compare(JI_img, X_img)
-
-            if YI_diff < JI_diff:
-                return "已"
-            else:
-                return "己"
-
-        JI_list = list(filter(lambda kvt: kvt[1] == "己", tableDict.items()))
-        if len(JI_list) > 1:
-            for kv in JI_list:
-                k = kv[0]
-                v = cmp_JI_YI(k)
-                tableDict[k] = v
-            return tableDict
-        else:
-            return tableDict
-
-    _dict = common_replace(jjFontTableDict)
-    _dict = patch_JI_YI(_dict)
-    return _dict
 
 
 def matchJJFont(fontname: str) -> dict[str, str]:
@@ -399,7 +333,7 @@ def matchJJFont(fontname: str) -> dict[str, str]:
         jjhash = JJhashs[i]
         mchar = quickMatch(jjkey, JJttf)
         if not mchar:
-            logging.info(f'快速匹配失败，开始图形匹配。字体名称：{fontname}，字体编号：{hex(ord(jjkey))}')
+            logging.info(f'快速匹配失败，开始图形匹配。字体名称：{fontname}，字符编号：{hex(ord(jjkey))}')
             mchar = match(jjkey, jjhash)
             mCoor = getCoord(jjkey, JJttf)
             newCoor = [mchar, mCoor]
@@ -408,7 +342,6 @@ def matchJJFont(fontname: str) -> dict[str, str]:
         logging.debug("{}\t{}\t{}".format(fontname, ord(jjkey), mchar))
         results[jjkey] = mchar
 
-    results = patchJJFontResult(fontname, results)
     logging.info(f'识别字体 {fontname} 完成。')
     return results
 
